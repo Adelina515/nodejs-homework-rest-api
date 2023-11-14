@@ -1,4 +1,6 @@
 const express = require("express");
+require("dotenv").config();
+require("./db");
 const logger = require("morgan");
 const cors = require("cors");
 
