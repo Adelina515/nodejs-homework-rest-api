@@ -15,7 +15,7 @@ async function getContact(req, res, next) {
     const { contactId } = req.params;
     const contact = await Contact.findById(contactId).exec();
     if (contact === null) {
-      throw HttpError(404, "Not found");
+      return res.status(404).send("Not found");
     }
     res.status(200).send(contact);
   } catch (error) {
@@ -84,7 +84,7 @@ async function updateStatusContact(req, res, next) {
   };
   try {
     if (!body) {
-      throw HttpError(400, message.error);
+      throw HttpError(400, "missing field favorite");
     }
     const result = await Contact.findByIdAndUpdate(contactId, body, {
       new: true,
