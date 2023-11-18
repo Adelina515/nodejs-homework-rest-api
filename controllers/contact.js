@@ -31,9 +31,32 @@ async function createContact(req, res, next) {
     favorite: req.body.favorite,
   };
   try {
-    if (!contact) {
-      throw HttpError(400, message.error);
+    if (!req.body || Object.keys(req.body).length === 0) {
+      throw HttpError(400, "missing required  field");
     }
+    if (!req.body.name) {
+      missingFields.push("name");
+    }
+
+    if (!req.body.email) {
+      missingFields.push("email");
+    }
+
+    if (!req.body.phone) {
+      missingFields.push("phone");
+    }
+
+    if (!req.body.favorite) {
+      missingFields.push("favorite");
+    }
+
+    if (missingFields.length > 0) {
+      const errorMessage = `missing required  ${missingFields.join(
+        ", "
+      )} field`;
+      throw HttpError(400, errorMessage);
+    }
+
     const result = await Contact.create(contact);
     res.status(201).send(result);
   } catch (error) {
@@ -50,9 +73,33 @@ async function updateContact(req, res, next) {
     favorite: req.body.favorite,
   };
   try {
-    if (!contact) {
-      throw HttpError(400, message.error);
+    const missingFields = [];
+
+    if (!req.body || Object.keys(req.body).length === 0) {
+      throw HttpError(400, "Missing fields");
     }
+
+    if (!req.body.name) {
+      missingFields.push("name");
+    }
+
+    if (!req.body.email) {
+      missingFields.push("email");
+    }
+
+    if (!req.body.phone) {
+      missingFields.push("phone");
+    }
+
+    if (!req.body.favorite) {
+      missingFields.push("favorite");
+    }
+
+    if (missingFields.length > 0) {
+      const errorMessage = `Missing fields: ${missingFields.join(", ")}`;
+      throw HttpError(400, errorMessage);
+    }
+
     const result = await Contact.findByIdAndUpdate(contactId, contact, {
       new: true,
     });
@@ -79,11 +126,8 @@ async function deleteContact(req, res, next) {
 
 async function updateStatusContact(req, res, next) {
   const { contactId } = req.params;
-  const body = {
-    favorite: req.body.favorite,
-  };
   try {
-    if (Object.keys(body).length === 0) {
+    if (Object.keys(req.body).length === 0) {
       throw HttpError(400, "missing field favorite");
     }
     const result = await Contact.findByIdAndUpdate(contactId, body, {
