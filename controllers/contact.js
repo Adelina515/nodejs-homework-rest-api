@@ -31,6 +31,7 @@ async function createContact(req, res, next) {
     favorite: req.body.favorite,
   };
   try {
+    const missingFields = [];
     if (!req.body || Object.keys(req.body).length === 0) {
       throw HttpError(400, "missing required  field");
     }
@@ -44,10 +45,6 @@ async function createContact(req, res, next) {
 
     if (!req.body.phone) {
       missingFields.push("phone");
-    }
-
-    if (!req.body.favorite) {
-      missingFields.push("favorite");
     }
 
     if (missingFields.length > 0) {
@@ -91,10 +88,6 @@ async function updateContact(req, res, next) {
       missingFields.push("phone");
     }
 
-    if (!req.body.favorite) {
-      missingFields.push("favorite");
-    }
-
     if (missingFields.length > 0) {
       const errorMessage = `Missing fields: ${missingFields.join(", ")}`;
       throw HttpError(400, errorMessage);
@@ -130,7 +123,7 @@ async function updateStatusContact(req, res, next) {
     if (Object.keys(req.body).length === 0) {
       throw HttpError(400, "missing field favorite");
     }
-    const result = await Contact.findByIdAndUpdate(contactId, body, {
+    const result = await Contact.findByIdAndUpdate(contactId, req.body, {
       new: true,
     });
     if (result === null) {
