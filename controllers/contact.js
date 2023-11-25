@@ -2,6 +2,7 @@ const Contact = require("../models/contacts");
 const { HttpError } = require("../helpers");
 
 async function getContacts(req, res, next) {
+  console.log(req.user);
   try {
     const contacts = await Contact.find().exec();
     res.status(200).send(contacts);
@@ -29,6 +30,7 @@ async function createContact(req, res, next) {
     email: req.body.email,
     phone: req.body.phone,
     favorite: req.body.favorite,
+    userId: req.user.id,
   };
   try {
     const missingFields = [];
