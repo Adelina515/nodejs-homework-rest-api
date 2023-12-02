@@ -3,6 +3,10 @@ const bcrypt = require("bcrypt");
 const { HttpError } = require("../helpers");
 const Joi = require("joi");
 const jwt = require("jsonwebtoken");
+const fs = require("node:fs/promises");
+const path = require("node:path");
+const gravatar = require("gravatar");
+const Jimp = require("jimp");
 
 const schema = Joi.object({
   password: Joi.string().required(),
@@ -25,16 +29,19 @@ async function register(req, res, next) {
       return res.status(409).send({ message: "Email in use" });
     }
     const passwordHash = await bcrypt.hash(password, 10);
+    const gravatarUrl = gravatar.url(email);
     const newUser = await User.create({
       password: passwordHash,
       email,
       subscription,
+      avatarURL: gravatarUrl,
     });
     res.status(201).send(
       res.status(201).send({
         user: {
           email: newUser.email,
           subscription: newUser.subscription,
+          avatarURL: newUser.avatarURL,
         },
       })
     );
@@ -74,6 +81,7 @@ async function login(req, res, next) {
       user: {
         email: user.email,
         subscription: user.subscription,
+        avatarURL: user.avatarURL,
       },
     });
   } catch (error) {
@@ -109,9 +117,44 @@ async function logoutUser(req, res, next) {
   }
 }
 
+async function processAndSaveAvatar(imagePath, userId) {
+  const outputFolder = path.join(__dirname, "..", "public/avatars");
+
+  const image = await Jimp.read(imagePath);
+
+  image.resize(250, 250);
+
+  const uniqueFileName = `${userId}_${Date.now()}.png`;
+
+  const outputPath = path.join(outputFolder, uniqueFileName);
+
+  await image.write(outputPath);
+
+  return outputPath;
+}
+
+async function uploadAvatar(req, res, next) {
+  try {
+    const avatarPath = await processAndSaveAvatar(req.file.path, req.user.id);
+    await fs.unlink(req.file.path);
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { avatarURL: `/avatars/${path.basename(avatarPath)}` },
+      { new: true }
+    ).exec();
+    if (user === null) {
+      return res.status(404).send({ message: "Not found" });
+    }
+    res.send(user);
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   register,
   login,
   currentUser,
   logoutUser,
+  uploadAvatar,
 };
