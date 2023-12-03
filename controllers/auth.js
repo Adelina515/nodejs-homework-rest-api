@@ -135,6 +135,9 @@ async function processAndSaveAvatar(imagePath, userId) {
 
 async function uploadAvatar(req, res, next) {
   try {
+    if (!req.file) {
+      return res.status(400).send({ message: "Missing required field: file" });
+    }
     const avatarPath = await processAndSaveAvatar(req.file.path, req.user.id);
     await fs.unlink(req.file.path);
     const user = await User.findByIdAndUpdate(
