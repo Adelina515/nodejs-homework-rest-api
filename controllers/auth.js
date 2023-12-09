@@ -1,3 +1,4 @@
+require("dotenv").config;
 const User = require("../models/user");
 const bcrypt = require("bcrypt");
 const { HttpError } = require("../helpers");
@@ -7,6 +8,8 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const gravatar = require("gravatar");
 const Jimp = require("jimp");
+const sgMail = require("@sendgrid/mail");
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const schema = Joi.object({
   password: Joi.string().required(),
@@ -154,10 +157,47 @@ async function uploadAvatar(req, res, next) {
   }
 }
 
+async function verificationTokenEmail(req, res, next) {
+  try {
+    const { verificationToken } = req.params;
+    const user = await User.findOne({ verificationToken });
+    if (!user) {
+      return res.status(404).send("Not found");
+    }
+    console.log(req.params.verificationToken);
+    user.verificationToken = null;
+    user.verify = true;
+    await user.save();
+
+    const msg = {
+      to: "adelgodlevska@gmail.com", // Change to your recipient
+      from: "adelgodlevska@gmail.com", // Change to your verified sender
+      subject: "Sending with SendGrid is Fun",
+      text: "and easy to do anywhere, even with Node.js",
+      html: "<strong>and easy to do anywhere, even with Node.js</strong>",
+    };
+    sgMail
+      .send(msg)
+      .then(() => {
+        console.log("Email sent");
+        res
+          .status(200)
+          .send({ message: "Verification successful. Email sent." });
+      })
+      .catch((error) => {
+        console.error(error);
+        res.status(500).json({ error: "Error sending verification email" });
+      });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   register,
   login,
   currentUser,
   logoutUser,
   uploadAvatar,
+  verificationTokenEmail,
 };
