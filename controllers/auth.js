@@ -10,6 +10,8 @@ const gravatar = require("gravatar");
 const Jimp = require("jimp");
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const { sendEmail } = require("../helpers");
+const { v4: uuidv4 } = require("uuid");
 
 const schema = Joi.object({
   password: Joi.string().required(),
@@ -33,10 +35,18 @@ async function register(req, res, next) {
     }
     const passwordHash = await bcrypt.hash(password, 10);
     const gravatarUrl = gravatar.url(email);
+    const verificationToken = uuidv4();
+    await sendEmail({
+      to: email, // Change to your recipient
+      subject: "Sending with SendGrid is Fun",
+      html: `To  confirm your registration please click on the <a href ="http://localhost:3000/users/verify/${verificationToken}">link</a>`,
+      text: `To  confirm your registration please open the link http://localhost:3000/users/verify/${verificationToken}`,
+    });
     const newUser = await User.create({
       password: passwordHash,
       email,
       subscription,
+      verificationToken,
       avatarURL: gravatarUrl,
     });
     res.status(201).send(
@@ -73,6 +83,11 @@ async function login(req, res, next) {
     if (isMatch === false) {
       return res.status(401).send({
         message: "Email or password is wrong",
+      });
+    }
+    if (user.verify !== true) {
+      return res.status(401).send({
+        message: "Email not verified. Please verify your email first.",
       });
     }
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
@@ -158,36 +173,42 @@ async function uploadAvatar(req, res, next) {
 }
 
 async function verificationTokenEmail(req, res, next) {
+  const { verificationToken } = req.params;
   try {
-    const { verificationToken } = req.params;
-    const user = await User.findOne({ verificationToken });
-    if (!user) {
+    const user = await User.findOne({ verificationToken }).exec();
+    if (!user || user === null) {
       return res.status(404).send("Not found");
     }
-    console.log(req.params.verificationToken);
-    user.verificationToken = null;
-    user.verify = true;
-    await user.save();
+    await User.findByIdAndUpdate(user._id, {
+      verificationToken: null,
+      verify: true,
+    });
+    res.status(200).send({ message: "Verification successful" });
+  } catch (error) {
+    next(error);
+  }
+}
 
-    const msg = {
-      to: "adelgodlevska@gmail.com", // Change to your recipient
-      from: "adelgodlevska@gmail.com", // Change to your verified sender
+async function verify(req, res, next) {
+  const { email } = req.body;
+  try {
+    const user = await User.findOne({ email }).exec();
+    if (email === "" || email === null || !email) {
+      return res.status(400).send({ message: "missing required field email" });
+    }
+    if (user.verify === true) {
+      return res
+        .status(400)
+        .send({ message: "Verification has already been passed" });
+    }
+    const verificationToken = uuidv4();
+    await sendEmail({
+      to: email, // Change to your recipient
       subject: "Sending with SendGrid is Fun",
-      text: "and easy to do anywhere, even with Node.js",
-      html: "<strong>and easy to do anywhere, even with Node.js</strong>",
-    };
-    sgMail
-      .send(msg)
-      .then(() => {
-        console.log("Email sent");
-        res
-          .status(200)
-          .send({ message: "Verification successful. Email sent." });
-      })
-      .catch((error) => {
-        console.error(error);
-        res.status(500).json({ error: "Error sending verification email" });
-      });
+      html: `To  confirm your registration please click on the <a href ="http://localhost:3000/users/verify/${verificationToken}">link</a>`,
+      text: `To  confirm your registration please open the link http://localhost:3000/users/verify/${verificationToken}`,
+    });
+    res.status(200).send({ message: "Verification email sent" });
   } catch (error) {
     next(error);
   }
@@ -200,4 +221,5 @@ module.exports = {
   logoutUser,
   uploadAvatar,
   verificationTokenEmail,
+  verify,
 };
